@@ -1,0 +1,68 @@
+components_manager:
+  task_processors:
+    main-task-processor:
+      worker_threads: 4
+    fs-task-processor:
+      worker_threads: 2
+  default_task_processor: main-task-processor
+
+  components:
+    server:
+      listener:
+        port: 8080
+        task_processor: main-task-processor
+
+    logging:
+      fs-task-processor: fs-task-processor
+      loggers:
+        default:
+          file_path: '@stdout'
+          level: info
+          overflow_behavior: discard
+
+    tracer:
+      service-name: event-producer
+
+    dynamic-config:
+      defaults: {}
+
+    default-secdist-provider:
+      config: /app/configs/secdist.json
+      missing-ok: false
+
+    secdist:
+      update-period: 0s
+
+    dns-client:
+      fs-task-processor: fs-task-processor
+
+    event-rabbit:
+      secdist_alias: event-rabbit
+      min_pool_size: 1
+      max_pool_size: 2
+      max_in_flight_requests: 5
+      use_secure_connection: false
+
+    publisher-topology: {}
+
+    event-publisher: {}
+
+    handler-create-user:
+      path: /users
+      method: POST
+      task_processor: main-task-processor
+
+    handler-create-event:
+      path: /events
+      method: POST
+      task_processor: main-task-processor
+
+    handler-register-for-event:
+      path: /events/register
+      method: POST
+      task_processor: main-task-processor
+
+    handler-cancel-registration:
+      path: /events/cancel
+      method: POST
+      task_processor: main-task-processor

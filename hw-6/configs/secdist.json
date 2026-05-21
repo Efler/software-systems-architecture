@@ -1,0 +1,11 @@
+{
+  "rabbitmq_settings": {
+    "event-rabbit": {
+      "hosts": ["rabbitmq"],
+      "port": 5672,
+      "login": "guest",
+      "password": "guest",
+      "vhost": "/"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+components_manager:
+  task_processors:
+    main-task-processor:
+      worker_threads: 4
+    fs-task-processor:
+      worker_threads: 2
+  default_task_processor: main-task-processor
+
+  components:
+    server:
+      listener:
+        port: 8081
+        task_processor: main-task-processor
+
+    logging:
+      fs-task-processor: fs-task-processor
+      loggers:
+        default:
+          file_path: '@stdout'
+          level: info
+          overflow_behavior: discard
+
+    tracer:
+      service-name: event-consumer
+
+    dynamic-config:
+      defaults: {}
+
+    default-secdist-provider:
+      config: /app/configs/secdist.json
+      missing-ok: false
+
+    secdist:
+      update-period: 0s
+
+    dns-client:
+      fs-task-processor: fs-task-processor
+
+    event-rabbit:
+      secdist_alias: event-rabbit
+      min_pool_size: 1
+      max_pool_size: 2
+      max_in_flight_requests: 5
+      use_secure_connection: false
+
+    processed-events-storage: {}
+
+    consumer-topology: {}
+
+    handler-processed-events:
+      path: /events/processed
+      method: GET
+      task_processor: main-task-processor
+
+    event-consumer:
+      rabbit_name: event-rabbit
+      queue: event-driven.events.queue
+      prefetch_count: 5

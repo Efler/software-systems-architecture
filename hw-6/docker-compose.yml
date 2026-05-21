@@ -1,0 +1,36 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: event-driven-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: event-driven-producer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    command: ["/app/event_producer", "--config", "/app/configs/producer_static_config.yaml"]
+    ports:
+      - "8080:8080"
+
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: event-driven-consumer
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    command: ["/app/event_consumer", "--config", "/app/configs/consumer_static_config.yaml"]
+    ports:
+      - "8081:8081"
