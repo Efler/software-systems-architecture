@@ -1,0 +1,78 @@
+services:
+
+  warehouse-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: warehouse-inventory-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRESQL: postgresql://warehouse_user:warehouse_password@postgres:5432/warehouse_inventory
+    ports:
+      - "8080:8080"
+    networks:
+      - warehouse-network
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: warehouse-inventory-swagger
+    depends_on:
+      - warehouse-api
+    ports:
+      - "8082:8080"
+    environment:
+      SWAGGER_JSON: /openapi.yaml
+    volumes:
+      - ./openapi.yaml:/openapi.yaml:ro
+    networks:
+      - warehouse-network
+
+  postgres:
+    image: postgres:16
+    container_name: warehouse-inventory-postgres
+    environment:
+      POSTGRES_DB: warehouse_inventory
+      POSTGRES_USER: warehouse_user
+      POSTGRES_PASSWORD: warehouse_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - warehouse-postgres-data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ./data.sql:/docker-entrypoint-initdb.d/002_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_user -d warehouse_inventory"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - warehouse-network
+
+  # for local testing
+  warehouse_pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: warehouse_pgadmin
+    restart: unless-stopped
+    ports:
+      - "5444:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "pgadmin_email@mail.com"
+      PGADMIN_DEFAULT_PASSWORD: "pgadmin_password"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - warehouse-pgadmin-data:/var/lib/pgadmin
+    networks:
+      - warehouse-network
+
+
+volumes:
+  warehouse-postgres-data:
+  warehouse-pgadmin-data:
+
+networks:
+  warehouse-network:
+    name: warehouse-network

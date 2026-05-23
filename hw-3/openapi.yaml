@@ -1,0 +1,969 @@
+openapi: 3.0.3
+info:
+  title: Warehouse Inventory API
+  version: 1.0.0
+  description: REST API сервиса Warehouse Inventory на userver.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Docker Compose API
+
+tags:
+  - name: Auth
+    description: Регистрация и вход пользователя
+  - name: Users
+    description: Пользователи системы
+  - name: Products
+    description: Товары склада
+  - name: Stock
+    description: Остатки товаров
+  - name: Receipts
+    description: Поступления товаров
+  - name: WriteOffs
+    description: Списания товаров
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Регистрация пользователя
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              default:
+                value:
+                  login: ivanov
+                  firstName: Ivan
+                  lastName: Ivanov
+                  email: ivanov@example.com
+                  role: warehouse_manager
+                  password: secret
+      responses:
+        '201':
+          description: Пользователь зарегистрирован, токен создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                default:
+                  value:
+                    token: token-1-1
+                    user:
+                      id: 1
+                      login: ivanov
+                      firstName: Ivan
+                      lastName: Ivanov
+                      email: ivanov@example.com
+                      role: warehouse_manager
+                      createdAt: '2026-05-23T19:00:02Z'
+        '409':
+          $ref: '#/components/responses/LoginAlreadyExists'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Логин пользователя
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  login: ivanov
+                  password: secret
+      responses:
+        '200':
+          description: Логин выполнен, токен создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                default:
+                  value:
+                    token: token-1-2
+                    user:
+                      id: 1
+                      login: ivanov
+                      firstName: Ivan
+                      lastName: Ivanov
+                      email: ivanov@example.com
+                      role: warehouse_manager
+                      createdAt: '2026-05-23T19:00:02Z'
+        '401':
+          description: Неверный логин или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                default:
+                  value:
+                    error:
+                      code: INVALID_CREDENTIALS
+                      message: Login or password is incorrect
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users:
+    post:
+      tags: [Users]
+      summary: Создание пользователя
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            examples:
+              default:
+                value:
+                  login: petrov
+                  firstName: Petr
+                  lastName: Petrov
+                  email: petrov@example.com
+                  role: warehouse_manager
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '409':
+          $ref: '#/components/responses/LoginAlreadyExists'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      tags: [Users]
+      summary: Поиск пользователей
+      description: Поиск работает либо по точному логину, либо по маске имени и фамилии.
+      operationId: searchUsers
+      parameters:
+        - name: login
+          in: query
+          required: false
+          schema:
+            type: string
+          example: ivanov
+        - name: firstNameMask
+          in: query
+          required: false
+          schema:
+            type: string
+          example: Iv
+        - name: lastNameMask
+          in: query
+          required: false
+          schema:
+            type: string
+          example: Ivan
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Пользователь или список пользователей найден
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/User'
+                  - $ref: '#/components/schemas/UserList'
+              examples:
+                byLogin:
+                  value:
+                    id: 1
+                    login: ivanov
+                    firstName: Ivan
+                    lastName: Ivanov
+                    email: ivanov@example.com
+                    role: warehouse_manager
+                    createdAt: '2026-05-23T19:00:02Z'
+                byMask:
+                  value:
+                    items:
+                      - id: 1
+                        login: ivanov
+                        firstName: Ivan
+                        lastName: Ivanov
+                        email: ivanov@example.com
+                        role: warehouse_manager
+                        createdAt: '2026-05-23T19:00:02Z'
+                    limit: 50
+                    offset: 0
+                    total: 1
+        '400':
+          $ref: '#/components/responses/SearchParamsRequired'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+
+  /products:
+    post:
+      tags: [Products]
+      summary: Добавление товара на склад
+      operationId: createProduct
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+            examples:
+              default:
+                value:
+                  name: Office monitor 24
+                  sku: MON-24-001
+                  unit: pcs
+                  description: Office monitor
+      responses:
+        '201':
+          description: Товар создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/SkuAlreadyExists'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      tags: [Products]
+      summary: Поиск товара по названию
+      operationId: searchProducts
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+          example: monitor
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Список найденных товаров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: 1
+                        name: Office monitor 24
+                        sku: MON-24-001
+                        unit: pcs
+                        description: Office monitor
+                        createdAt: '2026-05-23T19:00:02Z'
+                    limit: 50
+                    offset: 0
+                    total: 1
+        '400':
+          $ref: '#/components/responses/SearchParamsRequired'
+
+  /stock-balances:
+    get:
+      tags: [Stock]
+      summary: Получение остатков товаров
+      operationId: getStockBalances
+      parameters:
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: uint64
+            minimum: 1
+          example: 1
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+          example: monitor
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Текущие остатки товаров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockBalanceList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - productId: 1
+                        productName: Office monitor 24
+                        sku: MON-24-001
+                        unit: pcs
+                        quantity: 8
+                    limit: 50
+                    offset: 0
+                    total: 1
+        '400':
+          description: Некорректный productId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+
+  /receipts:
+    post:
+      tags: [Receipts]
+      summary: Создание поступления товара
+      operationId: createReceipt
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReceiptRequest'
+            examples:
+              default:
+                value:
+                  productId: 1
+                  quantity: 10
+                  createdBy: 1
+                  comment: Initial delivery
+      responses:
+        '201':
+          description: Поступление создано, остаток увеличен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptWithBalance'
+              examples:
+                default:
+                  value:
+                    id: 1
+                    productId: 1
+                    quantity: 10
+                    receivedAt: '2026-05-23T19:00:02Z'
+                    createdBy: 1
+                    comment: Initial delivery
+                    stockBalance:
+                      productId: 1
+                      quantity: 10
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Товар или пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      tags: [Receipts]
+      summary: Получение истории поступлений
+      operationId: listReceipts
+      parameters:
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: uint64
+            minimum: 1
+          example: 1
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: История поступлений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptList'
+              examples:
+                default:
+                  value:
+                    items:
+                      - id: 1
+                        productId: 1
+                        productName: Office monitor 24
+                        sku: MON-24-001
+                        quantity: 10
+                        receivedAt: '2026-05-23T19:00:02Z'
+                        createdBy:
+                          id: 1
+                          login: ivanov
+                        comment: Initial delivery
+                    limit: 50
+                    offset: 0
+                    total: 1
+        '400':
+          description: Некорректный productId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ProductNotFound'
+
+  /write-offs:
+    post:
+      tags: [WriteOffs]
+      summary: Списание товара со склада
+      operationId: createWriteOff
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWriteOffRequest'
+            examples:
+              default:
+                value:
+                  productId: 1
+                  quantity: 2
+                  createdBy: 1
+                  reason: Damaged package
+      responses:
+        '201':
+          description: Списание создано, остаток уменьшен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WriteOffWithBalance'
+              examples:
+                default:
+                  value:
+                    id: 1
+                    productId: 1
+                    quantity: 2
+                    writtenOffAt: '2026-05-23T19:00:02Z'
+                    createdBy: 1
+                    reason: Damaged package
+                    stockBalance:
+                      productId: 1
+                      quantity: 8
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Товар или пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Недостаточно товара для списания
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                default:
+                  value:
+                    error:
+                      code: NOT_ENOUGH_STOCK
+                      message: Not enough stock for write-off
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Укажите значение полностью, например `Bearer token-1-2`.
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 50
+      example: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      example: 0
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [login, firstName, lastName, email, password]
+      properties:
+        login:
+          type: string
+          example: ivanov
+        firstName:
+          type: string
+          example: Ivan
+        lastName:
+          type: string
+          example: Ivanov
+        email:
+          type: string
+          format: email
+          example: ivanov@example.com
+        role:
+          type: string
+          default: warehouse_manager
+          example: warehouse_manager
+        password:
+          type: string
+          format: password
+          example: secret
+
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+          example: ivanov
+        password:
+          type: string
+          format: password
+          example: secret
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          example: token-1-2
+        user:
+          $ref: '#/components/schemas/User'
+
+    CreateUserRequest:
+      type: object
+      required: [login, firstName, lastName, email]
+      properties:
+        login:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          default: warehouse_manager
+
+    User:
+      type: object
+      required: [id, login, firstName, lastName, email, role, createdAt]
+      properties:
+        id:
+          type: integer
+          format: uint64
+          example: 1
+        login:
+          type: string
+          example: ivanov
+        firstName:
+          type: string
+          example: Ivan
+        lastName:
+          type: string
+          example: Ivanov
+        email:
+          type: string
+          format: email
+          example: ivanov@example.com
+        role:
+          type: string
+          example: warehouse_manager
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-05-23T19:00:02Z'
+
+    UserList:
+      allOf:
+        - $ref: '#/components/schemas/PagedResponse'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+
+    CreateProductRequest:
+      type: object
+      required: [name, sku, unit]
+      properties:
+        name:
+          type: string
+          example: Office monitor 24
+        sku:
+          type: string
+          example: MON-24-001
+        unit:
+          type: string
+          example: pcs
+        description:
+          type: string
+          example: Office monitor
+
+    Product:
+      type: object
+      required: [id, name, sku, unit, description, createdAt]
+      properties:
+        id:
+          type: integer
+          format: uint64
+          example: 1
+        name:
+          type: string
+          example: Office monitor 24
+        sku:
+          type: string
+          example: MON-24-001
+        unit:
+          type: string
+          example: pcs
+        description:
+          type: string
+          example: Office monitor
+        createdAt:
+          type: string
+          format: date-time
+          example: '2026-05-23T19:00:02Z'
+
+    ProductList:
+      allOf:
+        - $ref: '#/components/schemas/PagedResponse'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Product'
+
+    StockBalance:
+      type: object
+      required: [productId, productName, sku, unit, quantity]
+      properties:
+        productId:
+          type: integer
+          format: uint64
+          example: 1
+        productName:
+          type: string
+          example: Office monitor 24
+        sku:
+          type: string
+          example: MON-24-001
+        unit:
+          type: string
+          example: pcs
+        quantity:
+          type: integer
+          format: uint64
+          example: 8
+
+    StockBalanceList:
+      allOf:
+        - $ref: '#/components/schemas/PagedResponse'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/StockBalance'
+
+    CreateReceiptRequest:
+      type: object
+      required: [productId, quantity, createdBy]
+      properties:
+        productId:
+          type: integer
+          format: uint64
+          minimum: 1
+        quantity:
+          type: integer
+          format: uint64
+          minimum: 1
+        receivedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: uint64
+          minimum: 1
+        comment:
+          type: string
+
+    Receipt:
+      type: object
+      required: [id, productId, quantity, receivedAt, createdBy, comment]
+      properties:
+        id:
+          type: integer
+          format: uint64
+        productId:
+          type: integer
+          format: uint64
+        productName:
+          type: string
+        sku:
+          type: string
+        quantity:
+          type: integer
+          format: uint64
+        receivedAt:
+          type: string
+          format: date-time
+        createdBy:
+          oneOf:
+            - type: integer
+              format: uint64
+            - $ref: '#/components/schemas/UserRef'
+        comment:
+          type: string
+
+    ReceiptWithBalance:
+      allOf:
+        - $ref: '#/components/schemas/Receipt'
+        - type: object
+          required: [stockBalance]
+          properties:
+            stockBalance:
+              $ref: '#/components/schemas/ShortStockBalance'
+
+    ReceiptList:
+      allOf:
+        - $ref: '#/components/schemas/PagedResponse'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Receipt'
+
+    CreateWriteOffRequest:
+      type: object
+      required: [productId, quantity, createdBy]
+      properties:
+        productId:
+          type: integer
+          format: uint64
+          minimum: 1
+        quantity:
+          type: integer
+          format: uint64
+          minimum: 1
+        writtenOffAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: uint64
+          minimum: 1
+        reason:
+          type: string
+
+    WriteOffWithBalance:
+      type: object
+      required: [id, productId, quantity, writtenOffAt, createdBy, reason, stockBalance]
+      properties:
+        id:
+          type: integer
+          format: uint64
+        productId:
+          type: integer
+          format: uint64
+        quantity:
+          type: integer
+          format: uint64
+        writtenOffAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: integer
+          format: uint64
+        reason:
+          type: string
+        stockBalance:
+          $ref: '#/components/schemas/ShortStockBalance'
+
+    ShortStockBalance:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: integer
+          format: uint64
+        quantity:
+          type: integer
+          format: uint64
+
+    UserRef:
+      type: object
+      required: [id, login]
+      properties:
+        id:
+          type: integer
+          format: uint64
+        login:
+          type: string
+
+    PagedResponse:
+      type: object
+      required: [items, limit, offset, total]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+        limit:
+          type: integer
+          example: 50
+        offset:
+          type: integer
+          example: 0
+        total:
+          type: integer
+          example: 1
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Request validation failed
+
+  responses:
+    Unauthorized:
+      description: Не передан или неверно указан Bearer-токен
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - type: object
+                properties:
+                  code:
+                    type: string
+                  message:
+                    type: string
+          examples:
+            default:
+              value:
+                code: '401'
+                message: Authorization header is required
+    ValidationError:
+      description: Ошибка валидации входных данных
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Required fields are missing
+    LoginAlreadyExists:
+      description: Пользователь с таким логином уже существует
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: LOGIN_ALREADY_EXISTS
+                  message: User with this login already exists
+    SkuAlreadyExists:
+      description: Товар с таким SKU уже существует
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: SKU_ALREADY_EXISTS
+                  message: Product with this sku already exists
+    ProductNotFound:
+      description: Товар не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: PRODUCT_NOT_FOUND
+                  message: Product was not found
+    UserNotFound:
+      description: Пользователь не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: USER_NOT_FOUND
+                  message: User with this login was not found
+    SearchParamsRequired:
+      description: Не переданы параметры поиска
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: SEARCH_PARAMS_REQUIRED
+                  message: Search query parameter is required
