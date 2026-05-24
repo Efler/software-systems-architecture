@@ -1,0 +1,68 @@
+services:
+
+  profi-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: profi-services-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-sentinel:
+        condition: service_started
+    environment:
+      POSTGRESQL: postgresql://profi_user:profi_password@postgres:5432/profi_services
+    ports:
+      - "8080:8080"
+    networks:
+      - profi-network
+
+  postgres:
+    image: postgres:16
+    container_name: profi-services-postgres
+    environment:
+      POSTGRES_DB: profi_services
+      POSTGRES_USER: profi_user
+      POSTGRES_PASSWORD: profi_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - profi-postgres-data:/var/lib/postgresql/data
+      - ./database/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - ./database/002_seed.sql:/docker-entrypoint-initdb.d/002_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U profi_user -d profi_services"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - profi-network
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: profi-services-redis
+    command: ["redis-server", "--appendonly", "no", "--protected-mode", "no"]
+    ports:
+      - "6379:6379"
+    networks:
+      - profi-network
+
+  redis-sentinel:
+    image: redis:7.2-alpine
+    container_name: profi-services-redis-sentinel
+    depends_on:
+      - redis
+    command: ["redis-sentinel", "/usr/local/etc/redis/sentinel.conf"]
+    volumes:
+      - ./configs/sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    ports:
+      - "26379:26379"
+    networks:
+      - profi-network
+
+volumes:
+  profi-postgres-data:
+
+networks:
+  profi-network:
+    name: profi-network

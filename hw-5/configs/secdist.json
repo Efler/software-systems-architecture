@@ -1,0 +1,18 @@
+{
+  "redis_settings": {
+    "profi-cache": {
+      "password": "",
+      "sentinels": [
+        {
+          "host": "redis-sentinel",
+          "port": 26379
+        }
+      ],
+      "shards": [
+        {
+          "name": "profi-cache-master"
+        }
+      ]
+    }
+  }
+}

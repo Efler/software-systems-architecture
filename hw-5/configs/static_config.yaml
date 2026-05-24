@@ -1,0 +1,90 @@
+components_manager:
+  task_processors:
+    main-task-processor:
+      worker_threads: 4
+    fs-task-processor:
+      worker_threads: 2
+  default_task_processor: main-task-processor
+
+  components:
+    server:
+      listener:
+        port: 8080
+        task_processor: main-task-processor
+
+    logging:
+      fs-task-processor: fs-task-processor
+      loggers:
+        default:
+          file_path: '@stdout'
+          level: info
+          overflow_behavior: discard
+
+    tracer:
+      service-name: profi-services-api
+
+    dynamic-config:
+      defaults: {}
+
+    default-secdist-provider:
+      config: /app/configs/secdist.json
+      missing-ok: false
+
+    secdist:
+      update-period: 0s
+
+    dns-client:
+      fs-task-processor: fs-task-processor
+
+    testsuite-support: {}
+
+    profi-database:
+      dbconnection#env: POSTGRESQL
+      dbconnection#fallback: 'postgresql://profi_user:profi_password@postgres:5432/profi_services'
+      blocking_task_processor: fs-task-processor
+      dns_resolver: async
+
+    profi-redis:
+      groups:
+        - config_name: profi-cache
+          db: profi-cache
+      subscribe_groups: []
+      thread_pools:
+        redis_thread_pool_size: 4
+        sentinel_thread_pool_size: 1
+
+    cache-store: {}
+
+    rate-limiter: {}
+
+    profi-storage: {}
+
+    handler-create-user:
+      path: /api/v1/users
+      method: POST
+      task_processor: main-task-processor
+
+    handler-search-users:
+      path: /api/v1/users
+      method: GET
+      task_processor: main-task-processor
+
+    handler-create-service:
+      path: /api/v1/services
+      method: POST
+      task_processor: main-task-processor
+
+    handler-list-services:
+      path: /api/v1/services
+      method: GET
+      task_processor: main-task-processor
+
+    handler-add-services-to-order:
+      path: /api/v1/orders/services
+      method: POST
+      task_processor: main-task-processor
+
+    handler-get-user-order:
+      path: /api/v1/orders
+      method: GET
+      task_processor: main-task-processor
