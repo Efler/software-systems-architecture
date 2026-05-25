@@ -1,0 +1,75 @@
+name: messenger-api
+
+services:
+
+  messenger-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: messenger_api_service
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongodb-validation:
+        condition: service_completed_successfully
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/messenger_api
+    ports:
+      - "8080:8080"
+    networks:
+      - messenger_api_network
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: messenger_api_swagger
+    depends_on:
+      - messenger-api
+    ports:
+      - "8082:8080"
+    environment:
+      SWAGGER_JSON: /openapi.yaml
+    volumes:
+      - ./openapi.yaml:/openapi.yaml:ro
+    networks:
+      - messenger_api_network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: messenger_api_mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: messenger_api
+    volumes:
+      - messenger_api_mongo_data:/data/db
+      - ./data.js:/docker-entrypoint-initdb.d/data.js:ro
+      - ./queries.js:/scripts/queries.js:ro
+      - ./validation.js:/scripts/validation.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - messenger_api_network
+
+  mongodb-validation:
+    image: mongo:7.0
+    container_name: messenger_api_mongodb_validation
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./validation.js:/scripts/validation.js:ro
+    command: ["mongosh", "mongodb://mongodb:27017/messenger_api", "--file", "/scripts/validation.js"]
+    networks:
+      - messenger_api_network
+
+
+volumes:
+  messenger_api_mongo_data:
+
+networks:
+  messenger_api_network:
+    name: messenger_api_network

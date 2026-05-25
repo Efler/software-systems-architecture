@@ -1,0 +1,92 @@
+components_manager:
+  task_processors:
+    main-task-processor:
+      worker_threads: 4
+    fs-task-processor:
+      worker_threads: 2
+  default_task_processor: main-task-processor
+
+  components:
+    server:
+      listener:
+        port: 8080
+        task_processor: main-task-processor
+
+    logging:
+      fs-task-processor: fs-task-processor
+      loggers:
+        default:
+          file_path: '@stdout'
+          level: info
+          overflow_behavior: discard
+
+    tracer:
+      service-name: messenger-api
+
+    dynamic-config:
+      defaults: {}
+
+    dns-client:
+      fs-task-processor: fs-task-processor
+
+    messenger-mongo:
+      dbconnection#env: MONGO_URI
+      dbconnection#fallback: 'mongodb://mongodb:27017/messenger_api'
+      appname: messenger-api
+      conn_timeout: 2s
+      so_timeout: 10s
+      queue_timeout: 1s
+      initial_size: 4
+      max_size: 32
+
+    handler-implicit-http-options:
+      as_fallback: implicit-http-options
+      method: OPTIONS
+      task_processor: main-task-processor
+
+    messenger-storage: {}
+
+    handler-health:
+      path: /api/v1/health
+      method: GET
+      task_processor: main-task-processor
+
+    handler-create-user:
+      path: /api/v1/users
+      method: POST
+      task_processor: main-task-processor
+
+    handler-search-users:
+      path: /api/v1/users
+      method: GET
+      task_processor: main-task-processor
+
+    handler-create-group-chat:
+      path: /api/v1/group-chats
+      method: POST
+      task_processor: main-task-processor
+
+    handler-add-group-member:
+      path: /api/v1/group-chats/members
+      method: POST
+      task_processor: main-task-processor
+
+    handler-add-group-message:
+      path: /api/v1/group-messages
+      method: POST
+      task_processor: main-task-processor
+
+    handler-list-group-messages:
+      path: /api/v1/group-messages
+      method: GET
+      task_processor: main-task-processor
+
+    handler-send-ptp-message:
+      path: /api/v1/ptp-messages
+      method: POST
+      task_processor: main-task-processor
+
+    handler-list-ptp-messages:
+      path: /api/v1/ptp-messages
+      method: GET
+      task_processor: main-task-processor

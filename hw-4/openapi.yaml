@@ -1,0 +1,327 @@
+openapi: 3.0.3
+info:
+  title: Messenger API
+  version: 1.0.0
+  description: API мессенджера на userver-framework и MongoDB.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/health:
+    get:
+      summary: Проверка состояния API
+      responses:
+        '200':
+          description: API доступно
+
+  /api/v1/users:
+    post:
+      summary: Создание нового пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            example:
+              login: pavel.orlov
+              firstName: Павел
+              lastName: Орлов
+              displayName: Павел Орлов
+              email: pavel.orlov@example.com
+              position: Integration Engineer
+              department: Platform
+              timezone: Europe/Moscow
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '409':
+          description: Логин уже занят
+    get:
+      summary: Поиск пользователей
+      parameters:
+        - name: login
+          in: query
+          schema:
+            type: string
+          description: Поиск одного пользователя по логину
+        - name: firstNameMask
+          in: query
+          schema:
+            type: string
+          description: Маска имени
+        - name: lastNameMask
+          in: query
+          schema:
+            type: string
+          description: Маска фамилии
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Пользователь или список пользователей
+
+  /api/v1/group-chats:
+    post:
+      summary: Создание группового чата
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupChatRequest'
+            example:
+              name: integrations
+              description: Интеграции с внешними сервисами
+              createdBy: '665000000000000000000001'
+              isPrivate: false
+      responses:
+        '201':
+          description: Групповой чат создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupChat'
+
+  /api/v1/group-chats/members:
+    post:
+      summary: Добавление пользователя в групповой чат
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddGroupMemberRequest'
+            example:
+              chatId: '665000000000000000000101'
+              userId: '665000000000000000000002'
+      responses:
+        '200':
+          description: Пользователь добавлен
+
+  /api/v1/group-messages:
+    post:
+      summary: Добавление сообщения в групповой чат
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddGroupMessageRequest'
+            example:
+              chatId: '665000000000000000000101'
+              senderId: '665000000000000000000001'
+              text: Сообщение из API
+      responses:
+        '201':
+          description: Сообщение создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMessage'
+    get:
+      summary: Загрузка сообщений группового чата
+      parameters:
+        - name: chatId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Список сообщений
+
+  /api/v1/ptp-messages:
+    post:
+      summary: Отправка PtP-сообщения пользователю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendPtpMessageRequest'
+            example:
+              senderId: '665000000000000000000001'
+              receiverId: '665000000000000000000002'
+              text: Привет, это личное сообщение
+      responses:
+        '201':
+          description: PtP-сообщение отправлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PtpMessage'
+    get:
+      summary: Получение PtP-списка сообщений для пользователя
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Список PtP-сообщений
+
+components:
+  schemas:
+    CreateUserRequest:
+      type: object
+      required:
+        - login
+        - firstName
+        - lastName
+        - email
+      properties:
+        login:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+        position:
+          type: string
+        department:
+          type: string
+        timezone:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        login:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+
+    CreateGroupChatRequest:
+      type: object
+      required:
+        - name
+        - createdBy
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        createdBy:
+          type: string
+        isPrivate:
+          type: boolean
+
+    GroupChat:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        createdBy:
+          type: string
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+
+    AddGroupMemberRequest:
+      type: object
+      required:
+        - chatId
+        - userId
+      properties:
+        chatId:
+          type: string
+        userId:
+          type: string
+
+    AddGroupMessageRequest:
+      type: object
+      required:
+        - chatId
+        - senderId
+        - text
+      properties:
+        chatId:
+          type: string
+        senderId:
+          type: string
+        text:
+          type: string
+
+    GroupMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        chatId:
+          type: string
+        senderId:
+          type: string
+        text:
+          type: string
+        createdAt:
+          type: string
+
+    SendPtpMessageRequest:
+      type: object
+      required:
+        - senderId
+        - receiverId
+        - text
+      properties:
+        senderId:
+          type: string
+        receiverId:
+          type: string
+        text:
+          type: string
+
+    PtpMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        chatId:
+          type: string
+        senderId:
+          type: string
+        receiverId:
+          type: string
+        text:
+          type: string
+        createdAt:
+          type: string
